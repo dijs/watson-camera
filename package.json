@@ -1,0 +1,18 @@
+{
+  "name": "watson-camera",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "mkdir -p temp && node --harmony-async-await index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.32.0",
+    "dotenv": "^4.0.0",
+    "jimp": "^0.2.27",
+    "nodemailer": "^3.1.8",
+    "request": "^2.81.0"
+  }
+}
