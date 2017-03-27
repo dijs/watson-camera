@@ -13,9 +13,10 @@
   "license": "MIT",
   "dependencies": {
     "aws-sdk": "^2.32.0",
+    "debug": "^2.6.3",
     "dotenv": "^4.0.0",
+    "fs-extra": "^2.1.2",
     "jimp": "^0.2.27",
-    "nodemailer": "^3.1.8",
-    "request": "^2.81.0"
+    "nodemailer": "^3.1.8"
   }
 }
