@@ -2,6 +2,7 @@ require('dotenv').config();
 const request = require('request');
 const fs = require('fs');
 const jimp = require('jimp');
+const nodemailer = require('nodemailer');
 const Rekognition = require('aws-sdk/clients/Rekognition');
 
 const config = {
@@ -15,6 +16,14 @@ const config = {
   confidenceThreshold: process.env.CONFIDENCE_THRESHOLD ? parseFloat(process.env.CONFIDENCE_THRESHOLD, 10) : 80,
 };
 
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: config.senderUser,
+    pass: config.senderPassword,
+  },
+});
+
 const lastPath = './temp/last.jpg';
 const currentPath = './temp/current.jpg';
 const DETECT = 'DETECT';
@@ -24,6 +33,34 @@ const rekognition = new Rekognition({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
 });
+
+function sendDetection(labels) {
+  const message = `We have detected "${labels.join(', ')}" from the "${config.cameraName}" camera.`;
+  const mailOptions = {
+    from: '"Watson" <watson.dijs@gmail.com>',
+    to: config.recipientEmails,
+    subject: `Detected "${labels.join(', ')}" from "${config.cameraName}"`,
+    text: message,
+    html: `
+      <p>${message}</p>
+      <br />
+      <img src="cid:detection" />
+    `,
+    attachments: [{
+      filename: 'current.jpg',
+      path: currentPath,
+      cid: 'detection',
+    }],
+  };
+  return new Promise((resolve, reject) => {
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+          return reject(error);
+      }
+      return resolve(info.messageId);
+    });
+  });
+}
 
 function saveSnapshot(path) {
   return new Promise((resolve, reject) => {
@@ -83,13 +120,16 @@ async function handleDetect() {
     return false;
   }
   const labels = await getLabels();
-  console.log(labels);
-  // TODO: Send base64 image and labels to email
-  // We have detected "<labels>" from the "<cameraName>" camera.
+  const messageId = await sendDetection(labels);
+  console.log(`Sent ${messageId}.`);
 }
 
 function loop() {
-  handleDetect();
+  try {
+    handleDetect();
+  } catch(e) {
+    console.log('Handle Detect Error', e);
+  }
   setTimeout(loop, config.intervalTime);
 }
 
