@@ -118,6 +118,9 @@ async function handleDetect() {
     return false;
   }
   const labels = await getLabels();
+  if (labels.length === 0) {
+    return false;
+  }
   const messageId = await sendDetection(labels);
   console.log(`Sent ${messageId}.`);
 }
