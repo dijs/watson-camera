@@ -1,13 +1,16 @@
 {
   "name": "watson-camera",
   "version": "1.0.0",
-  "description": "",
+  "description": "Camera Reporter for Watson",
+  "engines": {
+    "node": ">=7"
+  },
   "main": "index.js",
   "scripts": {
     "start": "mkdir -p temp && node --harmony-async-await index.js"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Richard van der Dys",
+  "license": "MIT",
   "dependencies": {
     "aws-sdk": "^2.32.0",
     "dotenv": "^4.0.0",
