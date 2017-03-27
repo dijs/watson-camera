@@ -111,12 +111,10 @@ function getLabels() {
 async function handleDetect() {
   const shouldContinue = await handleSnapshot();
   if (!shouldContinue) {
-    console.log('should not continue');
     return false;
   }
   const similar = await snapshotsSimilar();
   if (similar) {
-    console.log('similar');
     return false;
   }
   const labels = await getLabels();
