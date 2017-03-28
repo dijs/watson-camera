@@ -6,16 +6,16 @@ const debug = require('debug');
 const Rekognition = require('aws-sdk/clients/Rekognition');
 
 const config = {
-  intervalTime: process.env.INTERVAL_TIME ? parseInt(process.env.INTERVAL_TIME, 10) : 1000,
   recipientEmails: process.env.RECIPIENT_EMAILS.split(','),
   cameraName: process.env.CAMERA_NAME.trim(),
   senderUser: process.env.SENDER_USER.trim(),
   senderPassword: process.env.SENDER_PASSWORD.trim(),
   snapshotUrl: process.env.SNAPSHOT_URL.trim(),
-  diffThreshold: process.env.THRESHOLD ? parseFloat(process.env.THRESHOLD, 10) : 0.15,
+  diffThreshold: process.env.THRESHOLD ? parseFloat(process.env.THRESHOLD, 10) : 0.05,
   confidenceThreshold: process.env.CONFIDENCE_THRESHOLD ? parseFloat(process.env.CONFIDENCE_THRESHOLD, 10) : 80,
 };
 
+const debugLog = debug(`WatsonCameraDebug:${config.cameraName}:`);
 const log = debug(`WatsonCamera:${config.cameraName}:`);
 
 const transporter = nodemailer.createTransport({
@@ -36,12 +36,19 @@ const rekognition = new Rekognition({
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
 });
 
+function getMessage(labels) {
+  if (labels.length === 0) {
+    return `Detected something on "${config.cameraName}"`;
+  }
+  return `We have detected "${labels.join(', ')}" from the "${config.cameraName}" camera.`;
+}
+
 function sendDetection(labels, detectedImagePath) {
-  const message = `We have detected "${labels.join(', ')}" from the "${config.cameraName}" camera.`;
+  const message = getMessage(labels);
   const mailOptions = {
     from: '"Watson" <watson.dijs@gmail.com>',
     to: config.recipientEmails,
-    subject: `Detected "${labels.join(', ')}" from "${config.cameraName}"`,
+    subject: message,
     text: message,
     html: `
       <p>${message}</p>
@@ -49,7 +56,7 @@ function sendDetection(labels, detectedImagePath) {
       <img src="cid:detection" />
     `,
     attachments: [{
-      filename: 'current.jpg',
+      filename: `detection-${Date.now()}.jpg`,
       path: detectedImagePath,
       cid: 'detection',
     }],
@@ -122,27 +129,28 @@ async function handleDetect() {
   try {
     const shouldContinue = await handleSnapshot();
     if (!shouldContinue) {
-      log('Should not continue');
+      debugLog('Should not continue');
       return false;
     }
     if (Date.now() - lastDetectionAt < 2000) {
-      log('Too early after a detection.');
+      debugLog('Too early after a detection.');
       return;
     }
     const similar = snapshotsSimilar();
     if (similar) {
-      log('Current image is similar to last');
+      debugLog('Current image is similar to last');
       return false;
     }
+    log('Detected something. Trying to figure out what it was...');
     lastDetectionAt = Date.now();
     const detectionPath = await saveDetection();
     const labels = await getLabels(detectionPath);
-    if (labels.length === 0) {
-      log('Detected something, but could not find a label for it');
-      return false;
-    }
     const messageId = await sendDetection(labels, detectionPath);
-    log(`Detected "${labels.join(', ')}".`);
+    if (labels.length === 0) {
+      log('Could not find labels for the detection.');
+    } else {
+      log(`Detected "${labels.join(', ')}".`);
+    }
     fs.remove(detectionPath);
     return true;
   } catch(e) {
@@ -152,9 +160,22 @@ async function handleDetect() {
 }
 
 function loop() {
-  log('Watching for changes...');
-  let detectionMade = handleDetect();
-  setTimeout(loop, config.intervalTime);
+  const started = Date.now();
+  handleDetect()
+    .then(() => {
+      const took = Date.now() - started;
+      if (took > 1000) {
+        return loop();
+      }
+      setTimeout(loop, 1000 - took);
+    });
 }
 
-loop();
+log('Initializing...');
+return jimp.read(config.snapshotUrl)
+  .then(image => {
+    lastImage = image;
+    log('Started watching.');
+    loop();
+  })
+  .catch(e => console.log('could not read image', e))

@@ -3,3 +3,4 @@ node_modules
 .env
 temp
 yarn.lock
+npm-debug.log
